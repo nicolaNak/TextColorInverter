@@ -23,10 +23,7 @@ public class UpdateTextFromBackground : MonoBehaviour
     Vector2Int _checkXValues;
     Vector2Int _checkYValues;
 
-    private bool _initRectCheck = false;
-
     private int _iter = 0;
-
 
     private Vector3 _textPosition;
 
@@ -42,6 +39,13 @@ public class UpdateTextFromBackground : MonoBehaviour
 
     private RectTransform _positionCheckImage;
 
+    public Image _foundColorImage;
+    public Image _appliedColorImage;
+    public TMPro.TextMeshProUGUI _foundColorText;
+    public TMPro.TextMeshProUGUI _appliedColorText;
+
+    public RawImage _renderTextureCheck;
+
     void Start()
     {
         _text = GetComponent<TextMeshProUGUI>();
@@ -50,7 +54,7 @@ public class UpdateTextFromBackground : MonoBehaviour
         newCheck.AddComponent<Image>();
         newCheck.GetComponent<Image>().color = new Color(Color.magenta.r, Color.magenta.g, Color.magenta.b, 0.3f);
         newCheck.GetComponent<Image>().raycastTarget = false;
-        newCheck.transform.parent = transform;
+        newCheck.transform.SetParent(transform, false);
         _positionCheckImage = newCheck.GetComponent<RectTransform>();
         //align to far left
         _positionCheckImage.anchorMin = new Vector2(0f, 0.5f);
@@ -67,34 +71,67 @@ public class UpdateTextFromBackground : MonoBehaviour
 
     void Update()
     {
-        if (_iter <= 10)
+        if (_iter < 10)
         {
-            _adjustedWidth = _textPosition.x + _text.renderedWidth; //max x value
-            _adjustedHeight =_textPosition.y - _text.renderedHeight; //min y value
+            _iter++;
+        }
+        if (_iter == 10)
+        {
+            //get position of text box
+            Vector3[] cornerArray = new Vector3[4];
+            _text.rectTransform.GetWorldCorners(cornerArray);
 
-            _textPosition = _text.rectTransform.anchoredPosition3D;
+            //get rendered width & height
+            Vector2 renderedSize = _text.GetRenderedValues();
 
-            _checkXValues = new Vector2Int(Mathf.RoundToInt(_textPosition.x), Mathf.RoundToInt(_adjustedWidth));
-            _checkYValues = new Vector2Int(Mathf.RoundToInt(_adjustedHeight), Mathf.RoundToInt(_textPosition.y));
+            //get alignment of text
+            TextAlignmentOptions alignment = _text.alignment;
+            string alignmentStr = _text.alignment.ToString();
+
+            _VerticalAlignmentOptions verticalAlignment;
+            _HorizontalAlignmentOptions horizontalAlignment;
+
+            //split vertical and horizontal alignment
+            //if horizontal alignments are one word the vertical setting is top
+            if (alignmentStr.Contains("Left"))
+                horizontalAlignment = _HorizontalAlignmentOptions.Left;
+            if (alignmentStr.Contains("Center"))
+                horizontalAlignment = _HorizontalAlignmentOptions.Center;
+
+            //if vertical alignments are one word the horizontal setting is center
+
+           
+            //if ((alignment & TextAlignmentOptions.Left) != 0) 
+            //singular enum options are actually center + option, and vertical/horizontal alignment option enums don't match the regular alighment options
+
+               
+
+            for (int i = 0; i < 4; i++)
+            {
+                Debug.Log(cornerArray[i]);
+
+            //    if(i < 3)
+            //        DrawLine(cornerArray[i], cornerArray[i + 1], Color.green);
+            //    else
+            //        DrawLine(cornerArray[i], cornerArray[0], Color.green);
+            }
+
+            //use corner[0].x for LHS
+            //if (alignment.Contains("Left") || alignment.Contains("Justified"))
+            //{
+
+            //}
+            //if(alignment.Contains("Center") || alignment.Contains("GeoAligned"))
+
+            //botton LH position
+            Vector2 screenPositionLHS = LocalPositionToScreenPosition(_text.rectTransform);
+            //find top RH position using width/height
+            Vector2 screenPositionRHS = new Vector2(screenPositionLHS.x + _positionCheckImage.sizeDelta.x, screenPositionLHS.y + _positionCheckImage.sizeDelta.y);
+            //convert to int for iteration
+            _checkXValues = new Vector2Int(Mathf.RoundToInt(screenPositionLHS.x), Mathf.RoundToInt(screenPositionRHS.x));
+            _checkYValues = new Vector2Int(Mathf.RoundToInt(screenPositionLHS.y), Mathf.RoundToInt(screenPositionRHS.y));
 
             _iter++;
-
-            //_positionCheck.transform.SetParent(_text.transform.parent, false); 
-            //TODO: make image check have parent, move parent to match position and size of text, then change image to rendered width & height
-           // _positionCheck.GetComponent<RectTransform>().anchorMin = _text.rectTransform.anchorMin;
-            //_positionCheck.GetComponent<RectTransform>().anchorMax = _text.rectTransform.anchorMax;
-           // _positionCheck.GetComponent<RectTransform>().sizeDelta = _text.rectTransform.sizeDelta;
-            //_positionCheck.GetComponent<RectTransform>().anchoredPosition3D = _textPosition;
-
-            _positionCheckImage.transform.SetParent(_text.transform, false);
-            //_positionCheck.GetComponent<RectTransform>().anchorMin = _text.rectTransform.anchorMin;
-            //_positionCheck.GetComponent<RectTransform>().anchorMax = _text.rectTransform.anchorMax;
-            _positionCheckImage.sizeDelta = new Vector2(_text.renderedWidth, _text.renderedHeight);
-            //X pos adjusted by taking parent position and subtracting rendered width to bring in line with top of UI element
-            //Y pos adjusted by splitting parent height and subtracting split of rendered height to line up with left side of UI element
-            _positionCheckImage.anchoredPosition3D = new Vector3((Mathf.Abs(_textPosition.x) - _text.renderedWidth), (_text.rectTransform.sizeDelta.y * 0.5f - _text.renderedHeight * 0.5f), 0f);
-            //can this be done without parent object?
-
         }
 
         RenderTexture.active = CameraTexture;
@@ -104,8 +141,7 @@ public class UpdateTextFromBackground : MonoBehaviour
 
         RenderTexture.active = null;
 
-        _text.color = UpdateTextColor(false);
-        //_checkImage.color = _textUpdatedColour;
+        _text.faceColor = UpdateTextColor(false);
         
     }
 
@@ -114,6 +150,15 @@ public class UpdateTextFromBackground : MonoBehaviour
         Color colorCheck = Color.white;
         Color updatedColor = Color.black;
 
+        Texture2D updatedTexture = new Texture2D(100, 100);
+
+        if (_iter >= 10)
+        {
+            updatedTexture = new Texture2D(Mathf.RoundToInt(_positionCheckImage.sizeDelta.x), Mathf.RoundToInt(_positionCheckImage.sizeDelta.y));
+        }
+
+        int xIter = 0;
+        int yIter = 0;
         //get size of text area this script is attached to - need to check where text is on screen, default is 0,0 at bottom right corner of screen
         for (int x = _checkXValues.x; x <= _checkXValues.y; x++)
         {
@@ -125,7 +170,15 @@ public class UpdateTextFromBackground : MonoBehaviour
                 {
                     colorCheck *= 0.5f;
                 }
+
+                if (_iter >= 10)
+                {
+                    updatedTexture.SetPixel(xIter, yIter, _textureData.GetPixel(x, y));
+                }
+
+                yIter++;
             }
+            xIter++;
         }
 
         if (greyscale)
@@ -146,6 +199,19 @@ public class UpdateTextFromBackground : MonoBehaviour
 
         updatedColor.a = 1f;
 
+        _foundColorImage.color = colorCheck;
+        _appliedColorImage.color = updatedColor;
+
+        _foundColorText.text = "R:" + System.Math.Round(colorCheck.r, 2) + " G:" + System.Math.Round(colorCheck.g, 2) + " B:" + System.Math.Round(colorCheck.b, 2);
+        _appliedColorText.text = "R:" + System.Math.Round(updatedColor.r, 2) + " G:" + System.Math.Round(updatedColor.g, 2) + " B:" + System.Math.Round(updatedColor.b, 2);
+
+        if (_iter >= 10)
+        {
+            updatedTexture.Apply();
+            _renderTextureCheck.rectTransform.sizeDelta = _positionCheckImage.sizeDelta;
+            _renderTextureCheck.texture = updatedTexture;
+        }
+        
         return updatedColor;
     }
 
@@ -155,13 +221,22 @@ public class UpdateTextFromBackground : MonoBehaviour
         myLine.transform.position = start;
         myLine.AddComponent<LineRenderer>();
         LineRenderer lr = myLine.GetComponent<LineRenderer>();
-        lr.material = new Material(Shader.Find("Particles/Alpha Blended Premultiply"));
+        lr.material = new Material(Shader.Find("Unlit/Color"));
         lr.startColor = color;
         lr.endColor = color;
-        lr.startWidth = 0.1f;
-        lr.endWidth = 0.1f;
+        lr.startWidth = 5f;
+        lr.endWidth = 5f;
         lr.SetPosition(0, start);
         lr.SetPosition(1, end);
         //GameObject.Destroy(myLine, duration);
+    }
+
+    public Vector2 LocalPositionToScreenPosition(RectTransform _rectTransform)
+    {
+        Vector2 screenCenter = new Vector2(Screen.currentResolution.width / 2, Screen.currentResolution.height / 2);
+        Vector2 output = (Vector2)Camera.main.WorldToScreenPoint(_rectTransform.position);// - screenCenter;
+
+        Debug.Log(output);
+        return output;
     }
 }
